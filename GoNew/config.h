@@ -13,3 +13,5 @@
 #define TAPPING_TERM_PER_KEY
 #define RGB_MATRIX_STARTUP_SPD 60
 
+// Custom QMK here
+#define QUICK_TAP_TERM_PER_KEY
