@@ -14,3 +14,5 @@
 
 // Custom QMK here
 #define QUICK_TAP_TERM_PER_KEY
+
+#define ACHORDION_STREAK
