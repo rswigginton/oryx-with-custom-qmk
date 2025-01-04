@@ -6,7 +6,7 @@
 #define PERMISSIVE_HOLD
 
 #define USB_SUSPEND_WAKEUP_DELAY 0
-#define SERIAL_NUMBER "GoNew/AyvKG"
+#define SERIAL_NUMBER "GoNew/Grzow"
 #define LAYER_STATE_8BIT
 
 #define TAPPING_TERM_PER_KEY
