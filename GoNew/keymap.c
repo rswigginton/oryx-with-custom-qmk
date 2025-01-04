@@ -161,9 +161,9 @@ uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
 
 // ACHORDION
 
-// #ifdef ACHORDION_ENABLE
-// #include "features/achordion.h"
-// #endif  // ACHORDION_ENABLE
+#ifdef ACHORDION_ENABLE
+#include "features/achordion.h"
+#endif  // ACHORDION_ENABLE
 //
 // #ifdef ACHORDION_ENABLE
 // bool achordion_chord(uint16_t tap_hold_keycode,
