@@ -28,146 +28,7 @@
 #error "achordion: QMK version is too old to build. Please update QMK."
 #else
 
-// Copyhis way, things like
-    // chording multiple home row modifiers will work, but let's our logic
-    // consider simply a single tap-hold key as "active" at a time.
-    //
-    // Otherwise, we call `achordion_chord()` to determine whether to settle the
-    // tap-hold key as tapped vs. held. We implement the tap or hold by plumbing
-    // events back into the handling pipeline so that QMK features and other
-    // user code can see them. This is done by calling `process_record()`, which
-    // in turn calls most handlers including `process_record_user()`.
-    if (!is_streak &&
-        (!is_key_event || (is_tap_hold && record->tap.count == 0) ||
-         achordion_chord(tap_hold_keycode, &tap_hold_record, keycode,
-                         record))) {
-      settle_as_hold();
-
-#ifdef REPEAT_KEY_ENABLE
-      // Edge case involving LT + Repeat Key: in a sequence of "LT down, other
-      // down" where "other" is on the other layer in the same position as
-      // Repeat or Alternate Repeat, the repeated keycode is set instead of the
-      // the one on the switched-to layer. Here we correct that.
-      if (get_repeat_key_count() != 0 && IS_QK_LAYER_TAP(tap_hold_keycode)) {
-        record->keycode = KC_NO;  // Forget the repeated keycode.
-        clear_weak_mods();
-      }
-#endif  // REPEAT_KEY_ENABLE
-    } else {
-      settle_as_tap();
-
-#ifdef ACHORDION_STREAK
-      update_streak_timer(keycode, record);
-      if (is_streak && is_key_event && is_tap_hold && record->tap.count == 0) {
-        // If we are in a streak and resolved the current tap-hold key as a tap
-        // consider the next tap-hold key as active to be resolved next.
-        update_streak_timer(tap_hold_keycode, &tap_hold_record);
-        const uint16_t timeout = achordion_timeout(keycode);
-        tap_hold_keycode = keycode;
-        tap_hold_record = *record;
-        hold_timer = record->event.time + timeout;
-        achordion_state = STATE_UNSETTLED;
-        pressed_another_key_before_release = false;
-        return false;
-      }
-#endif
-    }
-
-    recursively_process_record(record, achordion_state);  // Re-process event.
-    return false;  // Block the original event.
-  }
-
-#ifdef ACHORDION_STREAK
-  // update idle timer on regular keys event
-  update_streak_timer(keycode, record);
-#endif
-  return true;
-}
-
-void achordion_task(void) {
-  if (achordion_state == STATE_UNSETTLED &&
-      timer_expired(timer_read(), hold_timer)) {
-    settle_as_hold();  // Timeout expired, settle the key as held.
-  }
-
-#ifdef ACHORDION_STREAK
-#define MAX_STREAK_TIMEOUT 800
-  if (streak_timer &&
-      timer_expired(timer_read(), (streak_timer + MAX_STREAK_TIMEOUT))) {
-    streak_timer = 0;  // Expired.
-  }
-#endif
-}
-
-// Returns true if `pos` on the left hand of the keyboard, false if right.
-static bool on_left_hand(keypos_t pos) {
-#ifdef SPLIT_KEYBOARD
-  return pos.row < MATRIX_ROWS / 2;
-#else
-  return (MATRIX_COLS > MATRIX_ROWS) ? pos.col < MATRIX_COLS / 2
-                                     : pos.row < MATRIX_ROWS / 2;
-#endif
-}
-
-bool achordion_opposite_hands(const keyrecord_t* tap_hold_record,
-                              const keyrecord_t* other_record) {
-  return on_left_hand(tap_hold_record->event.key) !=
-         on_left_hand(other_record->event.key);
-}
-
-// By default, use the BILATERAL_COMBINATIONS rule to consider the tap-hold key
-// "held" only when it and the other key are on opposite hands.
-__attribute__((weak)) bool achordion_chord(uint16_t tap_hold_keycode,
-                                           keyrecord_t* tap_hold_record,
-                                           uint16_t other_keycode,
-                                           keyrecord_t* other_record) {
-  return achordion_opposite_hands(tap_hold_record, other_record);
-}
-
-// By default, the timeout is 1000 ms for all keys.
-__attribute__((weak)) uint16_t achordion_timeout(uint16_t tap_hold_keycode) {
-  return 1000;
-}
-
-// By default, Shift and Ctrl mods are eager, and Alt and GUI are not.
-__attribute__((weak)) bool achordion_eager_mod(uint8_t mod) {
-  return (mod & (MOD_LALT | MOD_LGUI)) == 0;
-}
-
-#ifdef ACHORDION_STREAK
-__attribute__((weak)) bool achordion_streak_continue(uint16_t keycode) {
-  // If any mods other than shift or AltGr are held, don't continue the streak
-  if (get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) return false;
-  // This function doesn't get called for holds, so convert to tap version of
-  // keycodes
-  if (IS_QK_MOD_TAP(keycode)) keycode = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
-  if (IS_QK_LAYER_TAP(keycode)) keycode = QK_LAYER_TAP_GET_TAP_KEYCODE(keycode);
-  // Regular letters and punctuation continue the streak.
-  if (keycode >= KC_A && keycode <= KC_Z) return true;
-  switch (keycode) {
-    case KC_DOT:
-    case KC_COMMA:
-    case KC_QUOTE:
-    case KC_SPACE:
-      return true;
-  }
-  // All other keys end the streak
-  return false;
-}
-
-__attribute__((weak)) uint16_t achordion_streak_chord_timeout(
-    uint16_t tap_hold_keycode, uint16_t next_keycode) {
-  return achordion_streak_timeout(tap_hold_keycode);
-}
-
-__attribute__((weak)) uint16_t
-achordion_streak_timeout(uint16_t tap_hold_keycode) {
-  return 200;
-}
-#endif
-
-#endif  // version check
- of the `record` and `keycode` args for the current active tap-hold key.
+// Copy of the `record` and `keycode` args for the current active tap-hold key.
 static keyrecord_t tap_hold_record;
 static uint16_t tap_hold_keycode = KC_NO;
 // Timeout timer. When it expires, the key is considered held.
@@ -381,4 +242,142 @@ bool process_achordion(uint16_t keycode, keyrecord_t* record) {
     // Press event occurred on a key other than the active tap-hold key.
 
     // If the other key is *also* a tap-hold key and considered by QMK to be
-    // held, then we settle the active key as held. T
+    // held, then we settle the active key as held. This way, things like
+    // chording multiple home row modifiers will work, but let's our logic
+    // consider simply a single tap-hold key as "active" at a time.
+    //
+    // Otherwise, we call `achordion_chord()` to determine whether to settle the
+    // tap-hold key as tapped vs. held. We implement the tap or hold by plumbing
+    // events back into the handling pipeline so that QMK features and other
+    // user code can see them. This is done by calling `process_record()`, which
+    // in turn calls most handlers including `process_record_user()`.
+    if (!is_streak &&
+        (!is_key_event || (is_tap_hold && record->tap.count == 0) ||
+         achordion_chord(tap_hold_keycode, &tap_hold_record, keycode,
+                         record))) {
+      settle_as_hold();
+
+#ifdef REPEAT_KEY_ENABLE
+      // Edge case involving LT + Repeat Key: in a sequence of "LT down, other
+      // down" where "other" is on the other layer in the same position as
+      // Repeat or Alternate Repeat, the repeated keycode is set instead of the
+      // the one on the switched-to layer. Here we correct that.
+      if (get_repeat_key_count() != 0 && IS_QK_LAYER_TAP(tap_hold_keycode)) {
+        record->keycode = KC_NO;  // Forget the repeated keycode.
+        clear_weak_mods();
+      }
+#endif  // REPEAT_KEY_ENABLE
+    } else {
+      settle_as_tap();
+
+#ifdef ACHORDION_STREAK
+      update_streak_timer(keycode, record);
+      if (is_streak && is_key_event && is_tap_hold && record->tap.count == 0) {
+        // If we are in a streak and resolved the current tap-hold key as a tap
+        // consider the next tap-hold key as active to be resolved next.
+        update_streak_timer(tap_hold_keycode, &tap_hold_record);
+        const uint16_t timeout = achordion_timeout(keycode);
+        tap_hold_keycode = keycode;
+        tap_hold_record = *record;
+        hold_timer = record->event.time + timeout;
+        achordion_state = STATE_UNSETTLED;
+        pressed_another_key_before_release = false;
+        return false;
+      }
+#endif
+    }
+
+    recursively_process_record(record, achordion_state);  // Re-process event.
+    return false;  // Block the original event.
+  }
+
+#ifdef ACHORDION_STREAK
+  // update idle timer on regular keys event
+  update_streak_timer(keycode, record);
+#endif
+  return true;
+}
+
+void achordion_task(void) {
+  if (achordion_state == STATE_UNSETTLED &&
+      timer_expired(timer_read(), hold_timer)) {
+    settle_as_hold();  // Timeout expired, settle the key as held.
+  }
+
+#ifdef ACHORDION_STREAK
+#define MAX_STREAK_TIMEOUT 800
+  if (streak_timer &&
+      timer_expired(timer_read(), (streak_timer + MAX_STREAK_TIMEOUT))) {
+    streak_timer = 0;  // Expired.
+  }
+#endif
+}
+
+// Returns true if `pos` on the left hand of the keyboard, false if right.
+static bool on_left_hand(keypos_t pos) {
+#ifdef SPLIT_KEYBOARD
+  return pos.row < MATRIX_ROWS / 2;
+#else
+  return (MATRIX_COLS > MATRIX_ROWS) ? pos.col < MATRIX_COLS / 2
+                                     : pos.row < MATRIX_ROWS / 2;
+#endif
+}
+
+bool achordion_opposite_hands(const keyrecord_t* tap_hold_record,
+                              const keyrecord_t* other_record) {
+  return on_left_hand(tap_hold_record->event.key) !=
+         on_left_hand(other_record->event.key);
+}
+
+// By default, use the BILATERAL_COMBINATIONS rule to consider the tap-hold key
+// "held" only when it and the other key are on opposite hands.
+__attribute__((weak)) bool achordion_chord(uint16_t tap_hold_keycode,
+                                           keyrecord_t* tap_hold_record,
+                                           uint16_t other_keycode,
+                                           keyrecord_t* other_record) {
+  return achordion_opposite_hands(tap_hold_record, other_record);
+}
+
+// By default, the timeout is 1000 ms for all keys.
+__attribute__((weak)) uint16_t achordion_timeout(uint16_t tap_hold_keycode) {
+  return 1000;
+}
+
+// By default, Shift and Ctrl mods are eager, and Alt and GUI are not.
+__attribute__((weak)) bool achordion_eager_mod(uint8_t mod) {
+  return (mod & (MOD_LALT | MOD_LGUI)) == 0;
+}
+
+#ifdef ACHORDION_STREAK
+__attribute__((weak)) bool achordion_streak_continue(uint16_t keycode) {
+  // If any mods other than shift or AltGr are held, don't continue the streak
+  if (get_mods() & (MOD_MASK_CG | MOD_BIT_LALT)) return false;
+  // This function doesn't get called for holds, so convert to tap version of
+  // keycodes
+  if (IS_QK_MOD_TAP(keycode)) keycode = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
+  if (IS_QK_LAYER_TAP(keycode)) keycode = QK_LAYER_TAP_GET_TAP_KEYCODE(keycode);
+  // Regular letters and punctuation continue the streak.
+  if (keycode >= KC_A && keycode <= KC_Z) return true;
+  switch (keycode) {
+    case KC_DOT:
+    case KC_COMMA:
+    case KC_QUOTE:
+    case KC_SPACE:
+      return true;
+  }
+  // All other keys end the streak
+  return false;
+}
+
+__attribute__((weak)) uint16_t achordion_streak_chord_timeout(
+    uint16_t tap_hold_keycode, uint16_t next_keycode) {
+  return achordion_streak_timeout(tap_hold_keycode);
+}
+
+__attribute__((weak)) uint16_t
+achordion_streak_timeout(uint16_t tap_hold_keycode) {
+  return 200;
+}
+#endif
+
+#endif  // version check
