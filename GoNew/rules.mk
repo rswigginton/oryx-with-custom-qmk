@@ -10,5 +10,5 @@ CAPS_WORD_ENABLE = yes
 
 ACHORDION_ENABLE ?= yes
 ifeq ($(strip $(ACHORDION_ENABLE)), yes)
-	SRC += features/achordion.c
+	SRC += achordion.c
 endif

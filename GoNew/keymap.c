@@ -58,7 +58,7 @@ uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     }
 }
 
-#include "features/achordion.h"
+#include "achordion.h"
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 if (!process_achordion(keycode, record)) { return false; }
