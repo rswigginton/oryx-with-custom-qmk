@@ -76,3 +76,64 @@ if (!process_achordion(keycode, record)) { return false; }
 void matrix_scan_user(void) {
   achordion_task();
 }
+
+bool achordion_chord(uint16_t tap_hold_keycode,
+                     keyrecord_t* tap_hold_record,
+                     uint16_t other_keycode,
+                     keyrecord_t* other_record) {
+  // Also allow same-hand holds when the other key is in the rows outside the
+  // alphas. I need the `% (MATRIX_ROWS / 2)` because my keyboards are split.
+  uint8_t row = other_record->event.key.row % (MATRIX_ROWS / 2);
+  if (!(1 <= row && row <= 3)) { return true; }
+
+  // switch (tap_hold_keycode) {
+  //   // Exceptionally allow symbol layer LTs + row 0 in same-hand chords.
+  //   case HOME_S:
+  //   case HOME_I:
+  //     if (row == 0) { return true; }
+  //     break;
+  //   // Exceptionally allow G + J as a same-hand chord.
+  //   case NUM_G:
+  //     if (other_keycode == KC_J) { return true; }
+  //     break;
+  // }
+
+  return achordion_opposite_hands(tap_hold_record, other_record);
+}
+
+uint16_t achordion_timeout(uint16_t tap_hold_keycode) {
+  switch (tap_hold_keycode) {
+    default:
+      return 800;  // Use a timeout of 800 ms.
+  }
+}
+
+uint16_t achordion_streak_chord_timeout(
+    uint16_t tap_hold_keycode, uint16_t next_keycode) {
+  // Disable streak detection on LT keys.
+  if (IS_QK_LAYER_TAP(tap_hold_keycode)) {
+    return 0;
+  }
+
+  // Exceptions so that certain hotkeys don't get blocked as streaks.
+  // switch (tap_hold_keycode) {
+  //   case HOME_N:
+  //     if (next_keycode == KC_C || next_keycode == KC_V) {
+  //       return 0;
+  //     }
+  //     break;
+  //   case HOME_D:
+  //     if (next_keycode == HOME_N) {
+  //       return 0;
+  //     }
+  //     break;
+  // }
+
+  // Otherwise, tap_hold_keycode is a mod-tap key.
+  const uint8_t mod = mod_config(QK_MOD_TAP_GET_MODS(tap_hold_keycode));
+  if ((mod & MOD_LSFT) != 0) {
+    return 100;  // A short streak timeout for Shift mod-tap keys.
+  } else {
+    return 220;  // A longer timeout otherwise.
+  }
+}
