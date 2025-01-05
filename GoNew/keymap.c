@@ -1,6 +1,8 @@
 #include QMK_KEYBOARD_H
 #include "version.h"
+#ifdef ACHORDION_ENABLE
 #include "features/achordion.h"
+#endif  // ACHORDION_ENABLE
 #define MOON_LED_LEVEL LED_LEVEL
 #define ML_SAFE_RANGE SAFE_RANGE
 
@@ -54,7 +56,9 @@ uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
 
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-if (!process_achordion(keycode, record)) { return false; }
+#ifdef ACHORDION_ENABLE
+  if (!process_achordion(keycode, record)) { return false; }
+#endif  // ACHORDION_ENABLE
   switch (keycode) {
 
     case RGB_SLD:
@@ -66,6 +70,7 @@ if (!process_achordion(keycode, record)) { return false; }
   return true;
 }
 
+#ifdef ACHORDION_ENABLE
 void matrix_scan_user(void) {
   achordion_task();
 }
@@ -130,3 +135,4 @@ uint16_t achordion_streak_chord_timeout(
     return 220;  // A longer timeout otherwise.
   }
 }
+#endif  // ACHORDION_ENABLE

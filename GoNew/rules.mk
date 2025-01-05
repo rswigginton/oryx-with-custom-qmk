@@ -8,4 +8,8 @@ RGB_MATRIX_CUSTOM_KB = yes
 SPACE_CADET_ENABLE = no
 CAPS_WORD_ENABLE = yes
 
-SRC += features/achordion.c
+ACHORDION_ENABLE ?= no
+ifeq ($(strip $(ACHORDION_ENABLE)), yes)
+	OPT_DEFS += -DACHORDION_ENABLE
+	SRC += features/achordion.c
+endif
